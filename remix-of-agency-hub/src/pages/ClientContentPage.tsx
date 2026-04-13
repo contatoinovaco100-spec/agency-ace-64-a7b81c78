@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import logoInova from '@/assets/logo-inova.png';
 import { cn } from '@/lib/utils';
-import { Clapperboard, Calendar, Target, FileText, Link2, MessageSquare, Loader2, ChevronDown, ChevronRight, CheckCircle, CalendarCheck } from 'lucide-react';
+import { Clapperboard, Calendar, Target, FileText, Link2, MessageSquare, Loader2, ChevronDown, ChevronRight, CheckCircle } from 'lucide-react';
 
 interface TaskData {
   id: string;
@@ -27,16 +27,14 @@ interface TaskData {
   strategic_notes: string;
 }
 
-function TaskCard({ task, index, onConfirm, onSchedule }: { task: TaskData; index: number; onConfirm: (taskId: string) => void; onSchedule: (taskId: string) => void }) {
+function TaskCard({ task, index, onConfirm }: { task: TaskData; index: number; onConfirm: (taskId: string) => void }) {
   const [open, setOpen] = useState(index === 0);
   const videoName = task.video_name || task.title || 'Sem título';
   
   const isPosted = task.status === 'Postado';
-  const isScheduled = task.status === 'Programado';
-  const hasDueDate = task.due_date;
-  const isPastDue = hasDueDate ? new Date(task.due_date!) < new Date() : false;
-  const canSchedule = !isPosted && !isScheduled && hasDueDate;
-  const canConfirm = !isPosted;
+  const formattedDate = task.due_date 
+    ? new Date(task.due_date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
+    : 'Sem data';
 
   const sections = [
     { icon: Target, label: 'Objetivo', content: task.video_objective },
@@ -51,7 +49,6 @@ function TaskCard({ task, index, onConfirm, onSchedule }: { task: TaskData; inde
 
   return (
     <div className="rounded-xl border border-border bg-card overflow-hidden">
-      {/* Collapsed header */}
       <button
         onClick={() => setOpen(!open)}
         className="flex w-full items-center gap-4 p-5 text-left transition-colors hover:bg-secondary/20"
@@ -71,41 +68,30 @@ function TaskCard({ task, index, onConfirm, onSchedule }: { task: TaskData; inde
             {task.format && (
               <span className="rounded-full bg-info/10 px-2.5 py-0.5 text-[11px] font-medium text-info">{task.format}</span>
             )}
-            {task.status && (
-              <span className="rounded-full bg-secondary px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground">{task.status}</span>
-            )}
-            {task.due_date && (
-              <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                <Calendar className="h-3 w-3" />
-                {new Date(task.due_date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
-              </span>
-            )}
-            {!isPosted && (
-              <>
-                {canSchedule && (
-                  <button
-                    onClick={(e) => { e.stopPropagation(); onSchedule(task.id); }}
-                    className="flex items-center gap-1 rounded-full bg-blue-500/10 px-2.5 py-0.5 text-[11px] font-medium text-blue-500 hover:bg-blue-500/20 transition-colors"
-                  >
-                    <CalendarCheck className="h-3 w-3" />
-                    Programar
-                  </button>
-                )}
-                <button
-                  onClick={(e) => { e.stopPropagation(); onConfirm(task.id); }}
-                  className="flex items-center gap-1 rounded-full bg-green-500/10 px-2.5 py-0.5 text-[11px] font-medium text-green-500 hover:bg-green-500/20 transition-colors"
-                >
-                  <CheckCircle className="h-3 w-3" />
-                  Confirmar Postagem
-                </button>
-              </>
-            )}
+            <span className={cn(
+              "rounded-full px-2.5 py-0.5 text-[11px] font-medium",
+              isPosted ? "bg-green-500/20 text-green-500" : "bg-yellow-500/20 text-yellow-500"
+            )}>
+              {isPosted ? 'Postado' : task.status || 'Pendente'}
+            </span>
+            <span className="flex items-center gap-1 text-[11px] text-muted-foreground bg-secondary/50 px-2 py-0.5 rounded-full">
+              <Calendar className="h-3 w-3" />
+              {formattedDate}
+            </span>
           </div>
         </div>
+        {!isPosted && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onConfirm(task.id); }}
+            className="flex items-center gap-1 rounded-full bg-green-600 px-3 py-1.5 text-[12px] font-bold text-white hover:bg-green-700 transition-colors shrink-0"
+          >
+            <CheckCircle className="h-4 w-4" />
+            Confirmar Postagem
+          </button>
+        )}
         {open ? <ChevronDown className="h-5 w-5 text-muted-foreground shrink-0" /> : <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0" />}
       </button>
 
-      {/* Expanded content */}
       {open && (
         <div className="border-t border-border p-5 space-y-4">
           {task.description && (
@@ -174,30 +160,9 @@ export default function ClientContentPage() {
     }
   };
 
-  const handleSchedulePost = async (taskIdToSchedule: string) => {
-    setConfirmingId(taskIdToSchedule);
-    try {
-      const { error } = await supabase
-        .from('tasks')
-        .update({ status: 'Programado' })
-        .eq('id', taskIdToSchedule);
-      
-      if (error) throw error;
-      
-      setTasks(prev => prev.map(t => 
-        t.id === taskIdToSchedule ? { ...t, status: 'Programado' } : t
-      ));
-    } catch (err) {
-      console.error('Error scheduling post:', err);
-    } finally {
-      setConfirmingId(null);
-    }
-  };
-
   const loadContent = async (id: string) => {
     setLoading(true);
 
-    // First try as a task ID
     const { data: singleTask } = await supabase.from('tasks').select('*').eq('id', id).maybeSingle();
 
     if (singleTask) {
@@ -206,18 +171,8 @@ export default function ClientContentPage() {
         const { data: clientData } = await supabase.from('clients').select('company_name').eq('id', clientId).single();
         if (clientData) setClientName(clientData.company_name);
 
-        const { data: allTasks } = await supabase.from('tasks').select('*').eq('client_id', clientId).order('created_at');
-        const loadedTasks = (allTasks || [singleTask]) as TaskData[];
-        
-        const filteredTasks = loadedTasks.filter(task => {
-          if (task.status !== 'Postado' || !task.due_date) return true;
-          const dueDate = new Date(task.due_date);
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          return dueDate >= today;
-        });
-        
-        setTasks(filteredTasks);
+        const { data: allTasks } = await supabase.from('tasks').select('*').eq('client_id', clientId).order('due_date', { ascending: true });
+        setTasks((allTasks || [singleTask]) as TaskData[]);
       } else {
         setTasks([singleTask as TaskData]);
       }
@@ -225,11 +180,10 @@ export default function ClientContentPage() {
       return;
     }
 
-    // Try as a client ID
     const { data: clientData } = await supabase.from('clients').select('company_name').eq('id', id).maybeSingle();
     if (clientData) {
       setClientName(clientData.company_name);
-      const { data: allTasks } = await supabase.from('tasks').select('*').eq('client_id', id).order('created_at');
+      const { data: allTasks } = await supabase.from('tasks').select('*').eq('client_id', id).order('due_date', { ascending: true });
       if (allTasks && allTasks.length > 0) {
         setTasks(allTasks as TaskData[]);
         setLoading(false);
@@ -258,33 +212,32 @@ export default function ClientContentPage() {
     );
   }
 
+  const pendingCount = tasks.filter(t => t.status !== 'Postado').length;
+
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <header className="sticky top-0 z-10 border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-4">
           <img src={logoInova} alt="Inova" className="h-10" />
           <div className="text-right">
             {clientName && <p className="text-sm font-medium text-foreground">{clientName}</p>}
-            <p className="text-xs text-muted-foreground">{tasks.length} {tasks.length === 1 ? 'conteúdo pendente' : 'conteúdos pendentes'}</p>
+            <p className="text-xs text-muted-foreground">{pendingCount} {pendingCount === 1 ? 'pendente' : 'pendentes'}</p>
           </div>
         </div>
       </header>
 
-      {/* Content */}
       <main className="mx-auto max-w-3xl px-6 py-8">
         <div className="mb-6">
-          <h1 className="text-xl font-bold text-foreground">Ideias de Conteúdo</h1>
-          <p className="text-sm text-muted-foreground">Confira as ideias preparadas para você</p>
+          <h1 className="text-xl font-bold text-foreground">Cronograma de Conteúdo</h1>
+          <p className="text-sm text-muted-foreground">Confirme as postagens conforme forem sendo publicadas</p>
         </div>
 
         <div className="space-y-4">
           {tasks.map((task, i) => (
-            <TaskCard key={task.id} task={task} index={i} onConfirm={handleConfirmPost} onSchedule={handleSchedulePost} />
+            <TaskCard key={task.id} task={task} index={i} onConfirm={handleConfirmPost} />
           ))}
         </div>
 
-        {/* Footer */}
         <div className="mt-12 border-t border-border pt-6 text-center">
           <img src={logoInova} alt="Inova" className="mx-auto h-8 opacity-50" />
           <p className="mt-2 text-xs text-muted-foreground">Conteúdo preparado pela equipe Inova</p>
