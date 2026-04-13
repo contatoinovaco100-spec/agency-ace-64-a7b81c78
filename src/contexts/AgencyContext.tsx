@@ -1,0 +1,283 @@
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { Client, Task, Lead, TeamMember, CalendarEvent, ServiceType, TaskChecklistItem, TaskComment, TaskAttachment, TaskStageHistory } from '@/types/agency';
+import { useAuth } from '@/contexts/AuthContext';
+import { Tables, TablesInsert } from '@/integrations/supabase/types';
+import { toDatabaseTaskStatus, toUiTaskStatus } from '@/lib/taskStatus';
+
+interface AgencyContextType {
+  clients: Client[];
+  tasks: Task[];
+  leads: Lead[];
+  team: TeamMember[];
+  events: CalendarEvent[];
+  loading: boolean;
+  addClient: (client: Client) => Promise<void>;
+  updateClient: (client: Client) => Promise<void>;
+  deleteClient: (id: string) => Promise<void>;
+  addTask: (task: Task) => Promise<void>;
+  updateTask: (task: Task) => Promise<void>;
+  deleteTask: (id: string) => Promise<void>;
+  advanceVideoStage: (task: Task, changedBy: string) => Promise<void>;
+  addLead: (lead: Lead) => Promise<void>;
+  updateLead: (lead: Lead) => Promise<void>;
+  deleteLead: (id: string) => Promise<void>;
+  convertLeadToClient: (leadId: string, clientData: Partial<Client>) => Promise<void>;
+  addTeamMember: (member: TeamMember) => Promise<void>;
+  updateTeamMember: (member: TeamMember) => Promise<void>;
+  deleteTeamMember: (id: string) => Promise<void>;
+  addEvent: (event: CalendarEvent) => Promise<void>;
+  deleteEvent: (id: string) => Promise<void>;
+  getChecklist: (taskId: string) => Promise<TaskChecklistItem[]>;
+  upsertChecklistItem: (item: TaskChecklistItem) => Promise<void>;
+  deleteChecklistItem: (id: string) => Promise<void>;
+  getComments: (taskId: string) => Promise<TaskComment[]>;
+  addComment: (comment: TaskComment) => Promise<void>;
+  getAttachments: (taskId: string) => Promise<TaskAttachment[]>;
+  addAttachment: (attachment: TaskAttachment) => Promise<void>;
+  deleteAttachment: (id: string) => Promise<void>;
+  getStageHistory: (taskId: string) => Promise<TaskStageHistory[]>;
+  refresh: () => Promise<void>;
+}
+
+const AgencyContext = createContext<AgencyContextType | undefined>(undefined);
+
+function rowToClient(row: Tables<'clients'>): Client {
+  return {
+    id: row.id, companyName: row.company_name, contactName: row.contact_name,
+    email: row.email, phone: row.phone, contractStartDate: row.contract_start_date || '',
+    monthlyValue: Number(row.monthly_value), scope: row.scope,
+    serviceType: row.service_type as ServiceType[], accountManager: row.account_manager,
+    status: row.status as Client['status'], notes: row.notes,
+    scopeDetails: {
+      monthlyDeliverables: row.scope_monthly_deliverables || [],
+      includedServices: row.scope_included_services || [],
+      demandLimits: row.scope_demand_limits,
+      platforms: row.scope_platforms || [],
+      strategicNotes: row.scope_strategic_notes,
+    },
+  };
+}
+
+function clientToRow(c: Client): TablesInsert<'clients'> {
+  return {
+    id: c.id, company_name: c.companyName, contact_name: c.contactName,
+    email: c.email, phone: c.phone, contract_start_date: c.contractStartDate || null,
+    monthly_value: c.monthlyValue, scope: c.scope, service_type: c.serviceType,
+    account_manager: c.accountManager, status: c.status, notes: c.notes,
+    scope_monthly_deliverables: c.scopeDetails?.monthlyDeliverables || [],
+    scope_included_services: c.scopeDetails?.includedServices || [],
+    scope_demand_limits: c.scopeDetails?.demandLimits || '',
+    scope_platforms: c.scopeDetails?.platforms || [],
+    scope_strategic_notes: c.scopeDetails?.strategicNotes || '',
+  };
+}
+
+function rowToTask(row: any): Task {
+  return {
+    id: row.id, clientId: row.client_id || '', title: row.title, description: row.description,
+    assignee: row.assignee, priority: row.priority, dueDate: row.due_date || '', status: toUiTaskStatus(row.status) as Task['status'],
+    taskType: row.task_type || 'Geral',
+    videoName: row.video_name || '', platform: row.platform || '', format: row.format || '',
+    videoObjective: row.video_objective || '', scriptWriter: row.script_writer || '',
+    editor: row.editor || '', videoIdea: row.video_idea || '', fullScript: row.full_script || '',
+    videoReferences: row.video_references || '', observations: row.observations || '',
+    creativeDirection: row.creative_direction || '', editingStyle: row.editing_style || '',
+    strategicNotes: row.strategic_notes || '', recordingNotes: row.recording_notes || '',
+    editorComments: row.editor_comments || '', currentStageOwner: row.current_stage_owner || '',
+    copywriter: row.copywriter || '', director: row.director || '', videomaker: row.videomaker || '',
+  };
+}
+
+function rowToLead(row: Tables<'leads'>): Lead {
+  return {
+    id: row.id, name: row.name, company: row.company, email: row.email, phone: row.phone,
+    source: row.source, assignee: row.assignee, notes: row.notes,
+    stage: row.stage as Lead['stage'], estimatedValue: Number(row.estimated_value), createdAt: row.created_at,
+  };
+}
+function rowToTeamMember(row: Tables<'team_members'>): TeamMember {
+  return { id: row.id, name: row.name, role: row.role, email: row.email, permissions: row.permissions, avatar: row.avatar || undefined };
+}
+function rowToEvent(row: Tables<'calendar_events'>): CalendarEvent {
+  return { id: row.id, title: row.title, date: row.date, type: row.type as CalendarEvent['type'], clientId: row.client_id || undefined };
+}
+
+export function AgencyProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  const [allClients, setAllClients] = useState<Client[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [team, setTeam] = useState<TeamMember[]>([]);
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [allowedClientIds, setAllowedClientIds] = useState<string[] | null>(null);
+
+  // Check role & access
+  useEffect(() => {
+    if (!user) return;
+    supabase.from('user_roles').select('role').eq('user_id', user.id).eq('role', 'admin')
+      .then(({ data }) => {
+        const admin = !!data && data.length > 0;
+        setIsAdmin(admin);
+        if (!admin) {
+          supabase.from('user_client_access').select('client_id').eq('user_id', user.id)
+            .then(({ data: access }) => setAllowedClientIds(access?.map(a => a.client_id) ?? []));
+        } else {
+          setAllowedClientIds(null);
+        }
+      });
+  }, [user]);
+
+  // Filtered clients
+  const clients = useMemo(() => {
+    if (allowedClientIds === null) return allClients; // admin sees all
+    return allClients.filter(c => allowedClientIds.includes(c.id));
+  }, [allClients, allowedClientIds]);
+
+  const fetchAll = useCallback(async () => {
+    setLoading(true);
+    const [cRes, tRes, lRes, tmRes, eRes] = await Promise.all([
+      supabase.from('clients').select('*').order('created_at'),
+      supabase.from('tasks').select('*').order('created_at'),
+      supabase.from('leads').select('*').order('created_at'),
+      supabase.from('team_members').select('*').order('created_at'),
+      supabase.from('calendar_events').select('*').order('date'),
+    ]);
+    if (cRes.data) setAllClients(cRes.data.map(rowToClient));
+    if (tRes.data) setTasks(tRes.data.map(rowToTask));
+    if (lRes.data) setLeads(lRes.data.map(rowToLead));
+    if (tmRes.data) setTeam(tmRes.data.map(rowToTeamMember));
+    if (eRes.data) setEvents(eRes.data.map(rowToEvent));
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  const taskToRow = (t: Task) => ({
+    id: t.id, client_id: t.clientId || null, title: t.title, description: t.description,
+    assignee: t.assignee, priority: t.priority, due_date: t.dueDate || null, status: toDatabaseTaskStatus(t.status),
+    task_type: t.taskType, video_name: t.videoName, platform: t.platform, format: t.format,
+    video_objective: t.videoObjective, script_writer: t.scriptWriter, editor: t.editor,
+    video_idea: t.videoIdea, full_script: t.fullScript, video_references: t.videoReferences,
+    observations: t.observations, creative_direction: t.creativeDirection,
+    editing_style: t.editingStyle, strategic_notes: t.strategicNotes,
+    recording_notes: t.recordingNotes, editor_comments: t.editorComments,
+    current_stage_owner: t.currentStageOwner, copywriter: t.copywriter,
+    director: t.director, videomaker: t.videomaker,
+  });
+
+  const addClient = async (c: Client) => { await supabase.from('clients').insert(clientToRow(c)); await fetchAll(); };
+  const updateClient = async (c: Client) => { const { id, ...rest } = clientToRow(c); await supabase.from('clients').update(rest).eq('id', c.id); await fetchAll(); };
+  const deleteClient = async (id: string) => { await supabase.from('clients').delete().eq('id', id); await fetchAll(); };
+
+  const addTask = async (t: Task) => {
+    const { error } = await supabase.from('tasks').insert(taskToRow(t) as any);
+    if (error) { console.error('Error inserting task:', error); throw error; }
+    if (t.taskType === 'Produção de Vídeo') {
+      const items = ['Corte correto', 'Legendas aplicadas', 'Música aplicada', 'Identidade visual aplicada', 'Revisão final feita']
+        .map((label, i) => ({ id: crypto.randomUUID(), task_id: t.id, label, checked: false, sort_order: i }));
+      await supabase.from('task_checklist_items').insert(items);
+    }
+    await fetchAll();
+  };
+
+  const updateTask = async (t: Task) => {
+    const { id, ...rest } = taskToRow(t);
+    await supabase.from('tasks').update(rest as any).eq('id', t.id);
+    await fetchAll();
+  };
+
+  const deleteTask = async (id: string) => { await supabase.from('tasks').delete().eq('id', id); await fetchAll(); };
+
+  const advanceVideoStage = async (task: Task, changedBy: string) => {
+    const stages = ['Em copy', 'Em direção', 'Em gravação', 'Em edição', 'Finalizado'];
+    const idx = stages.indexOf(toDatabaseTaskStatus(task.status));
+    if (idx < 0 || idx >= stages.length - 1) return;
+    const nextStage = stages[idx + 1];
+    const ownerMap: Record<string, string> = {
+      'Em direção': task.director,
+      'Em gravação': task.videomaker,
+      'Em edição': task.editor,
+      'Finalizado': '',
+    };
+    const updated = { ...task, status: toUiTaskStatus(nextStage) as Task['status'], currentStageOwner: ownerMap[nextStage] || '' };
+    await updateTask(updated);
+    await supabase.from('task_stage_history').insert({
+      task_id: task.id, from_stage: toDatabaseTaskStatus(task.status), to_stage: nextStage, changed_by: changedBy,
+    } as any);
+  };
+
+  const addLead = async (l: Lead) => { await supabase.from('leads').insert({ id: l.id, name: l.name, company: l.company, email: l.email, phone: l.phone, source: l.source, assignee: l.assignee, notes: l.notes, stage: l.stage, estimated_value: l.estimatedValue }); await fetchAll(); };
+  const updateLead = async (l: Lead) => { await supabase.from('leads').update({ name: l.name, company: l.company, email: l.email, phone: l.phone, source: l.source, assignee: l.assignee, notes: l.notes, stage: l.stage, estimated_value: l.estimatedValue }).eq('id', l.id); await fetchAll(); };
+  const deleteLead = async (id: string) => { await supabase.from('leads').delete().eq('id', id); await fetchAll(); };
+
+  const convertLeadToClient = async (leadId: string, clientData: Partial<Client>) => {
+    const lead = leads.find(l => l.id === leadId);
+    if (!lead) return;
+    const newClient: Client = {
+      id: crypto.randomUUID(), companyName: lead.company, contactName: lead.name,
+      email: lead.email, phone: lead.phone, contractStartDate: new Date().toISOString().split('T')[0],
+      monthlyValue: clientData.monthlyValue || lead.estimatedValue, scope: clientData.scope || '',
+      serviceType: clientData.serviceType || [], accountManager: lead.assignee, status: 'Ativo',
+      notes: lead.notes, scopeDetails: clientData.scopeDetails || { monthlyDeliverables: [], includedServices: [], demandLimits: '', platforms: [], strategicNotes: '' },
+    };
+    await addClient(newClient);
+    await updateLead({ ...lead, stage: 'Cliente fechado' });
+  };
+
+  const addTeamMember = async (m: TeamMember) => { await supabase.from('team_members').insert({ id: m.id, name: m.name, role: m.role, email: m.email, permissions: m.permissions, avatar: m.avatar || null }); await fetchAll(); };
+  const updateTeamMember = async (m: TeamMember) => { await supabase.from('team_members').update({ name: m.name, role: m.role, email: m.email, permissions: m.permissions, avatar: m.avatar || null }).eq('id', m.id); await fetchAll(); };
+  const deleteTeamMember = async (id: string) => { await supabase.from('team_members').delete().eq('id', id); await fetchAll(); };
+
+  const addEvent = async (e: CalendarEvent) => { await supabase.from('calendar_events').insert({ id: e.id, title: e.title, date: e.date, type: e.type, client_id: e.clientId || null }); await fetchAll(); };
+  const deleteEvent = async (id: string) => { await supabase.from('calendar_events').delete().eq('id', id); await fetchAll(); };
+
+  const getChecklist = async (taskId: string): Promise<TaskChecklistItem[]> => {
+    const { data } = await supabase.from('task_checklist_items').select('*').eq('task_id', taskId).order('sort_order');
+    return (data || []).map((r: any) => ({ id: r.id, taskId: r.task_id, label: r.label, checked: r.checked, sortOrder: r.sort_order }));
+  };
+  const upsertChecklistItem = async (item: TaskChecklistItem) => { await supabase.from('task_checklist_items').upsert({ id: item.id, task_id: item.taskId, label: item.label, checked: item.checked, sort_order: item.sortOrder }); };
+  const deleteChecklistItem = async (id: string) => { await supabase.from('task_checklist_items').delete().eq('id', id); };
+
+  const getComments = async (taskId: string): Promise<TaskComment[]> => {
+    const { data } = await supabase.from('task_comments').select('*').eq('task_id', taskId).order('created_at');
+    return (data || []).map((r: any) => ({ id: r.id, taskId: r.task_id, author: r.author, content: r.content, createdAt: r.created_at }));
+  };
+  const addComment = async (comment: TaskComment) => { await supabase.from('task_comments').insert({ id: comment.id, task_id: comment.taskId, author: comment.author, content: comment.content }); };
+
+  const getAttachments = async (taskId: string): Promise<TaskAttachment[]> => {
+    const { data } = await supabase.from('task_attachments').select('*').eq('task_id', taskId).order('created_at');
+    return (data || []).map((r: any) => ({ id: r.id, taskId: r.task_id, fileName: r.file_name, fileUrl: r.file_url, fileType: r.file_type, createdAt: r.created_at }));
+  };
+  const addAttachment = async (att: TaskAttachment) => { await supabase.from('task_attachments').insert({ id: att.id, task_id: att.taskId, file_name: att.fileName, file_url: att.fileUrl, file_type: att.fileType }); };
+  const deleteAttachment = async (id: string) => { await supabase.from('task_attachments').delete().eq('id', id); };
+
+  const getStageHistory = async (taskId: string): Promise<TaskStageHistory[]> => {
+    const { data } = await supabase.from('task_stage_history').select('*').eq('task_id', taskId).order('created_at');
+    return (data || []).map((r: any) => ({ id: r.id, taskId: r.task_id, fromStage: r.from_stage, toStage: r.to_stage, changedBy: r.changed_by, createdAt: r.created_at }));
+  };
+
+  return (
+    <AgencyContext.Provider value={{
+      clients, tasks, leads, team, events, loading,
+      addClient, updateClient, deleteClient,
+      addTask, updateTask, deleteTask, advanceVideoStage,
+      addLead, updateLead, deleteLead, convertLeadToClient,
+      addTeamMember, updateTeamMember, deleteTeamMember,
+      addEvent, deleteEvent,
+      getChecklist, upsertChecklistItem, deleteChecklistItem,
+      getComments, addComment, getAttachments, addAttachment, deleteAttachment,
+      getStageHistory, refresh: fetchAll,
+    }}>
+      {children}
+    </AgencyContext.Provider>
+  );
+}
+
+export function useAgency() {
+  const ctx = useContext(AgencyContext);
+  if (!ctx) throw new Error('useAgency must be used within AgencyProvider');
+  return ctx;
+}
