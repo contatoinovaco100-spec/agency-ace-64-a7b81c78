@@ -29,11 +29,12 @@ interface TaskData {
   strategic_notes: string;
 }
 
-function TaskCard({ task, index, onConfirm }: { task: TaskData; index: number; onConfirm: (taskId: string) => void; confirming?: boolean }) {
+function TaskCard({ task, index, onConfirm, onConfirmProgram }: { task: TaskData; index: number; onConfirm: (taskId: string) => void; onConfirmProgram: (taskId: string) => void; confirming?: boolean }) {
   const [open, setOpen] = useState(index === 0);
   const videoName = task.video_name || task.title || 'Sem título';
   
   const isPosted = task.status === 'Postado';
+  const isProgramado = task.status === 'Programado';
   const displayDate = task.scheduled_date || task.due_date;
   const formattedDate = displayDate 
     ? new Date(displayDate).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -87,7 +88,26 @@ function TaskCard({ task, index, onConfirm }: { task: TaskData; index: number; o
             </span>
           </div>
         </div>
-        {!isPosted && (
+        {!isPosted && !isProgramado && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onConfirmProgram(task.id); }}
+            disabled={confirming}
+            className={cn(
+              "flex items-center gap-1 rounded-full px-3 py-1.5 text-[12px] font-bold text-white transition-colors shrink-0",
+              confirming 
+                ? "bg-blue-700/70 cursor-wait" 
+                : "bg-blue-600 hover:bg-blue-700"
+            )}
+          >
+            {confirming ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Calendar className="h-4 w-4" />
+            )}
+            {confirming ? "Confirmando..." : "Confirmar Programação"}
+          </button>
+        )}
+        {isProgramado && !isPosted && (
           <button
             onClick={(e) => { e.stopPropagation(); onConfirm(task.id); }}
             disabled={confirming}
@@ -180,6 +200,28 @@ export default function ClientContentPage() {
     }
   };
 
+  const handleConfirmProgram = async (taskIdToConfirm: string) => {
+    setConfirmingId(taskIdToConfirm);
+    try {
+      const { error } = await supabase
+        .from('tasks')
+        .update({ status: 'Programado' })
+        .eq('id', taskIdToConfirm);
+      
+      if (error) throw error;
+      
+      setTasks(prev => prev.map(t => 
+        t.id === taskIdToConfirm ? { ...t, status: 'Programado' } : t
+      ));
+      toast.success('Programação confirmada com sucesso!');
+    } catch (err) {
+      console.error('Error confirming program:', err);
+      toast.error('Erro ao confirmar programação');
+    } finally {
+      setConfirmingId(null);
+    }
+  };
+
   const loadContent = async (id: string) => {
     setLoading(true);
 
@@ -234,6 +276,7 @@ export default function ClientContentPage() {
 
   const pendingTasks = tasks.filter(t => t.status !== 'Postado');
   const postedTasks = tasks.filter(t => t.status === 'Postado');
+  const programadoTasks = tasks.filter(t => t.status === 'Programado');
   const displayedTasks = showPosted ? tasks : pendingTasks;
 
   return (
@@ -269,7 +312,7 @@ export default function ClientContentPage() {
             <p className="text-center text-muted-foreground py-8">Nenhuma tarefa pendente!</p>
           ) : (
             displayedTasks.map((task, i) => (
-              <TaskCard key={task.id} task={task} index={i} onConfirm={handleConfirmPost} confirming={confirmingId === task.id} />
+              <TaskCard key={task.id} task={task} index={i} onConfirm={handleConfirmPost} onConfirmProgram={handleConfirmProgram} confirming={confirmingId === task.id} />
             ))
           )}
         </div>
