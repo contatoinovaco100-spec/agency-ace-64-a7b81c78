@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import logoInova from '@/assets/logo-inova.png';
 import { cn } from '@/lib/utils';
 import { Clapperboard, Calendar, Target, FileText, Link2, MessageSquare, Loader2, ChevronDown, ChevronRight, CheckCircle } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface TaskData {
   id: string;
@@ -18,6 +19,7 @@ interface TaskData {
   platform: string;
   format: string;
   due_date: string | null;
+  scheduled_date: string | null;
   assignee: string;
   client_id: string | null;
   priority: string;
@@ -27,14 +29,16 @@ interface TaskData {
   strategic_notes: string;
 }
 
-function TaskCard({ task, index, onConfirm }: { task: TaskData; index: number; onConfirm: (taskId: string) => void }) {
+function TaskCard({ task, index, onConfirm }: { task: TaskData; index: number; onConfirm: (taskId: string) => void; confirming?: boolean }) {
   const [open, setOpen] = useState(index === 0);
   const videoName = task.video_name || task.title || 'Sem título';
   
   const isPosted = task.status === 'Postado';
-  const formattedDate = task.due_date 
-    ? new Date(task.due_date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
+  const displayDate = task.scheduled_date || task.due_date;
+  const formattedDate = displayDate 
+    ? new Date(displayDate).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
     : 'Sem data';
+  const isPast = displayDate && new Date(displayDate) < new Date();
 
   const sections = [
     { icon: Target, label: 'Objetivo', content: task.video_objective },
@@ -74,7 +78,10 @@ function TaskCard({ task, index, onConfirm }: { task: TaskData; index: number; o
             )}>
               {isPosted ? 'Postado' : task.status || 'Pendente'}
             </span>
-            <span className="flex items-center gap-1 text-[11px] text-muted-foreground bg-secondary/50 px-2 py-0.5 rounded-full">
+            <span className={cn(
+              "flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full",
+              isPast && !isPosted ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" : "text-muted-foreground bg-secondary/50"
+            )}>
               <Calendar className="h-3 w-3" />
               {formattedDate}
             </span>
@@ -83,10 +90,20 @@ function TaskCard({ task, index, onConfirm }: { task: TaskData; index: number; o
         {!isPosted && (
           <button
             onClick={(e) => { e.stopPropagation(); onConfirm(task.id); }}
-            className="flex items-center gap-1 rounded-full bg-green-600 px-3 py-1.5 text-[12px] font-bold text-white hover:bg-green-700 transition-colors shrink-0"
+            disabled={confirming}
+            className={cn(
+              "flex items-center gap-1 rounded-full px-3 py-1.5 text-[12px] font-bold text-white transition-colors shrink-0",
+              confirming 
+                ? "bg-green-700/70 cursor-wait" 
+                : "bg-green-600 hover:bg-green-700"
+            )}
           >
-            <CheckCircle className="h-4 w-4" />
-            Confirmar Postagem
+            {confirming ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <CheckCircle className="h-4 w-4" />
+            )}
+            {confirming ? "Confirmando..." : "Confirmar Postagem"}
           </button>
         )}
         {open ? <ChevronDown className="h-5 w-5 text-muted-foreground shrink-0" /> : <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0" />}
@@ -153,8 +170,10 @@ export default function ClientContentPage() {
       setTasks(prev => prev.map(t => 
         t.id === taskIdToConfirm ? { ...t, status: 'Postado' } : t
       ));
+      toast.success('Postagem confirmada com sucesso!');
     } catch (err) {
       console.error('Error confirming post:', err);
+      toast.error('Erro ao confirmar postagem');
     } finally {
       setConfirmingId(null);
     }
@@ -234,7 +253,7 @@ export default function ClientContentPage() {
 
         <div className="space-y-4">
           {tasks.map((task, i) => (
-            <TaskCard key={task.id} task={task} index={i} onConfirm={handleConfirmPost} />
+            <TaskCard key={task.id} task={task} index={i} onConfirm={handleConfirmPost} confirming={confirmingId === task.id} />
           ))}
         </div>
 
