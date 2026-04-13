@@ -1,4 +1,4 @@
 [run]
-build = "cd remix-of-agency-hub && npm install && npm run build"
-install = "cd remix-of-agency-hub && npm install"
-command = "cd remix-of-agency-hub && npm run dev"
+build = "sh -c 'cd remix-of-agency-hub && npm install && npm run build'"
+install = "sh -c 'cd remix-of-agency-hub && npm install'"
+command = "sh -c 'cd remix-of-agency-hub && npm run dev'"
