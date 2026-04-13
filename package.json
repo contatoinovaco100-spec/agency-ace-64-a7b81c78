@@ -1,0 +1,9 @@
+{
+  "name": "inova-lab-root",
+  "private": true,
+  "scripts": {
+    "dev": "cd remix-of-agency-hub && npm run dev",
+    "build": "cd remix-of-agency-hub && npm install && npm run build",
+    "install": "cd remix-of-agency-hub && npm install"
+  }
+}
