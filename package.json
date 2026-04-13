@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "dev": "cd remix-of-agency-hub && npm run dev",
-    "build": "cd remix-of-agency-hub && npm install && npm run build",
+    "build": "cd remix-of-agency-hub && npm install && npm run build && cp -r dist ../dist",
     "install": "cd remix-of-agency-hub && npm install"
   }
 }
