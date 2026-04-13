@@ -523,7 +523,7 @@ export default function DiagnosticEditorPage() {
         <header className="bg-[#0D6E5E] p-6 flex justify-between items-center shrink-0">
           <div className="flex flex-col">
             <img src={LogoInova} className="h-6" alt="Inova" />
-            <span className="text-[7px] text-white/20 font-bold uppercase tracking-[2px] mt-1 text-right">Engine v2.1.0</span>
+            <span className="text-[7px] text-white/20 font-bold uppercase tracking-[2px] mt-1 text-right">Engine v2.1.1</span>
           </div>
           <span className="text-[9px] text-[#bff720] font-black uppercase tracking-[3px]">Estratégico</span>
         </header>
