@@ -1,0 +1,86 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const { contract_id, signer_name } = await req.json();
+
+    if (!contract_id || !signer_name) {
+      return new Response(JSON.stringify({ error: 'contract_id and signer_name are required' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    );
+
+    // Verify contract exists and was just signed
+    const { data: contract, error: contractError } = await supabase
+      .from('contracts')
+      .select('title, client_name, monthly_value')
+      .eq('id', contract_id)
+      .eq('status', 'assinado')
+      .single();
+
+    if (contractError || !contract) {
+      return new Response(JSON.stringify({ error: 'Contract not found or not signed' }), {
+        status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const INSTANCE_ID = Deno.env.get('ZAPI_INSTANCE_ID');
+    const ZAPI_TOKEN = Deno.env.get('ZAPI_TOKEN');
+
+    if (!INSTANCE_ID || !ZAPI_TOKEN) {
+      console.warn('Z-API credentials not configured, skipping WhatsApp notification');
+      return new Response(JSON.stringify({ success: true, skipped: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const ZAPI_BASE = `https://api.z-api.io/instances/${INSTANCE_ID}/token/${ZAPI_TOKEN}`;
+    const NOTIFY_PHONE = '5502481474167';
+
+    const value = Number(contract.monthly_value).toLocaleString('pt-BR', {
+      style: 'currency', currency: 'BRL',
+    });
+
+    const message = `✅ *Contrato Assinado!*\n\n` +
+      `📄 *${contract.title}*\n` +
+      `👤 Cliente: ${contract.client_name}\n` +
+      `✍️ Assinado por: ${signer_name}\n` +
+      `💰 Valor: ${value}/mês\n` +
+      `📅 ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+
+    const response = await fetch(`${ZAPI_BASE}/send-text`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: NOTIFY_PHONE, message }),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(`Z-API send failed [${response.status}]: ${JSON.stringify(data)}`);
+    }
+
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  } catch (error: unknown) {
+    console.error('Notification error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return new Response(JSON.stringify({ error: errorMessage }), {
+      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+});
