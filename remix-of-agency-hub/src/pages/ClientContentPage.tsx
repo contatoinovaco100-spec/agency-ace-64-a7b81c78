@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import logoInova from '@/assets/logo-inova.png';
 import { cn } from '@/lib/utils';
-import { Clapperboard, Calendar, Target, FileText, Link2, MessageSquare, Loader2, ChevronDown, ChevronRight } from 'lucide-react';
+import { Clapperboard, Calendar, Target, FileText, Link2, MessageSquare, Loader2, ChevronDown, ChevronRight, CheckCircle } from 'lucide-react';
 
 interface TaskData {
   id: string;
@@ -27,9 +27,14 @@ interface TaskData {
   strategic_notes: string;
 }
 
-function TaskCard({ task, index }: { task: TaskData; index: number }) {
+function TaskCard({ task, index, onConfirm }: { task: TaskData; index: number; onConfirm: (taskId: string) => void }) {
   const [open, setOpen] = useState(index === 0);
   const videoName = task.video_name || task.title || 'Sem título';
+  
+  const isPosted = task.status === 'Postado';
+  const hasDueDate = task.due_date;
+  const isPastDue = hasDueDate ? new Date(task.due_date!) < new Date() : false;
+  const isHidden = isPosted && isPastDue;
 
   const sections = [
     { icon: Target, label: 'Objetivo', content: task.video_objective },
@@ -72,6 +77,15 @@ function TaskCard({ task, index }: { task: TaskData; index: number }) {
                 <Calendar className="h-3 w-3" />
                 {new Date(task.due_date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
               </span>
+            )}
+            {!isPosted && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onConfirm(task.id); }}
+                className="flex items-center gap-1 rounded-full bg-green-500/10 px-2.5 py-0.5 text-[11px] font-medium text-green-500 hover:bg-green-500/20 transition-colors"
+              >
+                <CheckCircle className="h-3 w-3" />
+                Confirmar Postagem
+              </button>
             )}
           </div>
         </div>
@@ -120,11 +134,32 @@ export default function ClientContentPage() {
   const [clientName, setClientName] = useState('');
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!taskId) return;
     loadContent(taskId);
   }, [taskId]);
+
+  const handleConfirmPost = async (taskIdToConfirm: string) => {
+    setConfirmingId(taskIdToConfirm);
+    try {
+      const { error } = await supabase
+        .from('tasks')
+        .update({ status: 'Postado' })
+        .eq('id', taskIdToConfirm);
+      
+      if (error) throw error;
+      
+      setTasks(prev => prev.map(t => 
+        t.id === taskIdToConfirm ? { ...t, status: 'Postado' } : t
+      ));
+    } catch (err) {
+      console.error('Error confirming post:', err);
+    } finally {
+      setConfirmingId(null);
+    }
+  };
 
   const loadContent = async (id: string) => {
     setLoading(true);
@@ -133,17 +168,15 @@ export default function ClientContentPage() {
     const { data: singleTask } = await supabase.from('tasks').select('*').eq('id', id).maybeSingle();
 
     if (singleTask) {
-      // Found a task — load all tasks for the same client
       const clientId = singleTask.client_id;
       if (clientId) {
         const { data: clientData } = await supabase.from('clients').select('company_name').eq('id', clientId).single();
         if (clientData) setClientName(clientData.company_name);
 
         const { data: allTasks } = await supabase.from('tasks').select('*').eq('client_id', clientId).order('created_at');
-        let loadedTasks = (allTasks || [singleTask]) as TaskData[];
+        const loadedTasks = (allTasks || [singleTask]) as TaskData[];
         
-        // Filter out past posted content
-        loadedTasks = loadedTasks.filter(task => {
+        const filteredTasks = loadedTasks.filter(task => {
           if (task.status !== 'Postado' || !task.due_date) return true;
           const dueDate = new Date(task.due_date);
           const today = new Date();
@@ -151,7 +184,7 @@ export default function ClientContentPage() {
           return dueDate >= today;
         });
         
-        setTasks(loadedTasks);
+        setTasks(filteredTasks);
       } else {
         setTasks([singleTask as TaskData]);
       }
@@ -165,18 +198,7 @@ export default function ClientContentPage() {
       setClientName(clientData.company_name);
       const { data: allTasks } = await supabase.from('tasks').select('*').eq('client_id', id).order('created_at');
       if (allTasks && allTasks.length > 0) {
-        let loadedTasks = allTasks as TaskData[];
-        
-        // Filter out past posted content
-        loadedTasks = loadedTasks.filter(task => {
-          if (task.status !== 'Postado' || !task.due_date) return true;
-          const dueDate = new Date(task.due_date);
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          return dueDate >= today;
-        });
-        
-        setTasks(loadedTasks);
+        setTasks(allTasks as TaskData[]);
         setLoading(false);
         return;
       }
@@ -225,7 +247,7 @@ export default function ClientContentPage() {
 
         <div className="space-y-4">
           {tasks.map((task, i) => (
-            <TaskCard key={task.id} task={task} index={i} />
+            <TaskCard key={task.id} task={task} index={i} onConfirm={handleConfirmPost} />
           ))}
         </div>
 
