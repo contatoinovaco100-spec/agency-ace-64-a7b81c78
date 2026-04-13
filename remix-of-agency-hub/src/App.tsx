@@ -1,4 +1,5 @@
 // trigger fresh sync 2
+import { lazy, Suspense } from 'react';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -8,36 +9,45 @@ import { AgencyProvider } from "@/contexts/AgencyContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AppLayout } from "@/components/AppLayout";
-import Dashboard from "./pages/Dashboard";
-import ClientsPage from "./pages/ClientsPage";
-import CRMPage from "./pages/CRMPage";
-import TasksPage from "./pages/TasksPage";
-import TeamPage from "./pages/TeamPage";
-import ClientContentPage from "./pages/ClientContentPage";
-import LoginPage from "./pages/LoginPage";
-import PermissionsPage from "./pages/PermissionsPage";
-import ContractsPage from "./pages/ContractsPage";
-import ContractSignPage from "./pages/ContractSignPage";
-import ReportsPage from "./pages/ReportsPage";
-import PortfolioPage from "./pages/PortfolioPage";
-import ShootingSchedulePage from "./pages/ShootingSchedulePage";
-import WhiteboardPage from "./pages/WhiteboardPage";
-import ContentPlanningPage from "@/pages/ContentPlanningPage";
-import ProspectionPage from "@/pages/ProspectionPage";
-import SalesLP from "@/pages/SalesLP";
-import SalesEditorPage from "@/pages/SalesEditorPage";
-import DiagnosticEditorPage from "@/pages/DiagnosticEditorPage";
-import DiagnosticLP from "@/pages/DiagnosticLP";
-
-import PublicPortfolioPage from "./pages/PublicPortfolioPage";
-import ClientPortalPage from "./pages/ClientPortalPage";
-import NotFound from "./pages/NotFound";
-import BriefingFormPage from "./pages/BriefingFormPage";
-import BriefingsPage from "./pages/BriefingsPage";
-import NotificationsPage from "./pages/NotificationsPage";
 import { RealtimeNotifications } from "@/components/RealtimeNotifications";
+import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
+
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const ClientsPage = lazy(() => import("./pages/ClientsPage"));
+const CRMPage = lazy(() => import("./pages/CRMPage"));
+const TasksPage = lazy(() => import("./pages/TasksPage"));
+const TeamPage = lazy(() => import("./pages/TeamPage"));
+const ClientContentPage = lazy(() => import("./pages/ClientContentPage"));
+const LoginPage = lazy(() => import("./pages/LoginPage"));
+const PermissionsPage = lazy(() => import("./pages/PermissionsPage"));
+const ContractsPage = lazy(() => import("./pages/ContractsPage"));
+const ContractSignPage = lazy(() => import("./pages/ContractSignPage"));
+const ReportsPage = lazy(() => import("./pages/ReportsPage"));
+const PortfolioPage = lazy(() => import("./pages/PortfolioPage"));
+const ShootingSchedulePage = lazy(() => import("./pages/ShootingSchedulePage"));
+const WhiteboardPage = lazy(() => import("./pages/WhiteboardPage"));
+const ContentPlanningPage = lazy(() => import("@/pages/ContentPlanningPage"));
+const ProspectionPage = lazy(() => import("@/pages/ProspectionPage"));
+const SalesLP = lazy(() => import("@/pages/SalesLP"));
+const SalesEditorPage = lazy(() => import("@/pages/SalesEditorPage"));
+const DiagnosticEditorPage = lazy(() => import("@/pages/DiagnosticEditorPage"));
+const DiagnosticLP = lazy(() => import("@/pages/DiagnosticLP"));
+const PublicPortfolioPage = lazy(() => import("./pages/PublicPortfolioPage"));
+const ClientPortalPage = lazy(() => import("./pages/ClientPortalPage"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const BriefingFormPage = lazy(() => import("./pages/BriefingFormPage"));
+const BriefingsPage = lazy(() => import("./pages/BriefingsPage"));
+const NotificationsPage = lazy(() => import("./pages/NotificationsPage"));
+
+function PageLoader() {
+  return (
+    <div className="flex items-center justify-center min-h-[400px]">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    </div>
+  );
+}
 
 function AppRoutes() {
   const location = useLocation();
@@ -49,56 +59,56 @@ function AppRoutes() {
                        location.pathname.startsWith('/proposta') ||
                        (location.pathname.startsWith('/diagnostico') && !location.pathname.startsWith('/diagnostico/editar'));
 
-  if (isPublicPage) {
-    return (
-      <Routes>
-        <Route path="/conteudo/:taskId" element={<ClientContentPage />} />
-        <Route path="/portal/:clientId" element={<ClientPortalPage />} />
-        <Route path="/contrato/:contractId" element={<ContractSignPage />} />
-        <Route path="/vitrine" element={<PublicPortfolioPage />} />
-        <Route path="/briefing" element={<BriefingFormPage />} />
-        <Route path="/proposta" element={<SalesLP />} />
-        <Route path="/proposta/:slug" element={<SalesLP />} />
-        <Route path="/proposta/editar" element={<SalesEditorPage />} />
-        <Route path="/diagnostico" element={<DiagnosticLP />} />
-        <Route path="/diagnostico/:slug" element={<DiagnosticLP />} />
-      </Routes>
-    );
-  }
-
   return (
-    <Routes>
-      <Route path="/login" element={<LoginPage />} />
-      <Route
-        path="/*"
-        element={
-          <ProtectedRoute>
-            <AppLayout>
-              <Routes>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/clientes" element={<ClientsPage />} />
-                <Route path="/crm" element={<CRMPage />} />
-                <Route path="/tarefas" element={<TasksPage />} />
-                <Route path="/planejamento" element={<ContentPlanningPage />} />
-                <Route path="/permissoes" element={<PermissionsPage />} />
-                <Route path="/contratos" element={<ContractsPage />} />
-                <Route path="/briefings" element={<BriefingsPage />} />
-                <Route path="/relatorios" element={<ReportsPage />} />
-                <Route path="/portfolio" element={<PortfolioPage />} />
-                <Route path="/gravacoes" element={<ShootingSchedulePage />} />
-                <Route path="/whiteboard" element={<WhiteboardPage />} />
-                <Route path="/prospeccao" element={<ProspectionPage />} />
-                <Route path="/proposta/editar" element={<SalesEditorPage />} />
-                <Route path="/diagnostico/editar" element={<DiagnosticEditorPage />} />
-                <Route path="/notificacoes" element={<NotificationsPage />} />
-                
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </AppLayout>
-          </ProtectedRoute>
-        }
-      />
-    </Routes>
+    <Suspense fallback={<PageLoader />}>
+      {isPublicPage ? (
+        <Routes>
+          <Route path="/conteudo/:taskId" element={<ClientContentPage />} />
+          <Route path="/portal/:clientId" element={<ClientPortalPage />} />
+          <Route path="/contrato/:contractId" element={<ContractSignPage />} />
+          <Route path="/vitrine" element={<PublicPortfolioPage />} />
+          <Route path="/briefing" element={<BriefingFormPage />} />
+          <Route path="/proposta" element={<SalesLP />} />
+          <Route path="/proposta/:slug" element={<SalesLP />} />
+          <Route path="/proposta/editar" element={<SalesEditorPage />} />
+          <Route path="/diagnostico" element={<DiagnosticLP />} />
+          <Route path="/diagnostico/:slug" element={<DiagnosticLP />} />
+        </Routes>
+      ) : (
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route
+            path="/*"
+            element={
+              <ProtectedRoute>
+                <AppLayout>
+                  <Routes>
+                    <Route path="/" element={<Dashboard />} />
+                    <Route path="/clientes" element={<ClientsPage />} />
+                    <Route path="/crm" element={<CRMPage />} />
+                    <Route path="/tarefas" element={<TasksPage />} />
+                    <Route path="/planejamento" element={<ContentPlanningPage />} />
+                    <Route path="/permissoes" element={<PermissionsPage />} />
+                    <Route path="/contratos" element={<ContractsPage />} />
+                    <Route path="/briefings" element={<BriefingsPage />} />
+                    <Route path="/relatorios" element={<ReportsPage />} />
+                    <Route path="/portfolio" element={<PortfolioPage />} />
+                    <Route path="/gravacoes" element={<ShootingSchedulePage />} />
+                    <Route path="/whiteboard" element={<WhiteboardPage />} />
+                    <Route path="/prospeccao" element={<ProspectionPage />} />
+                    <Route path="/proposta/editar" element={<SalesEditorPage />} />
+                    <Route path="/diagnostico/editar" element={<DiagnosticEditorPage />} />
+                    <Route path="/notificacoes" element={<NotificationsPage />} />
+                    
+                    <Route path="*" element={<NotFound />} />
+                  </Routes>
+                </AppLayout>
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
+      )}
+    </Suspense>
   );
 }
 
