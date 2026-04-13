@@ -1,6 +1,0 @@
-{
-  "buildCommand": "cd remix-of-agency-hub && npm install && npm run build",
-  "outputDirectory": "dist",
-  "installCommand": "cd remix-of-agency-hub && npm install",
-  "framework": "vite"
-}
