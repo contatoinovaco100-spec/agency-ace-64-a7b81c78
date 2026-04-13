@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import logoInova from '@/assets/logo-inova.png';
 import { cn } from '@/lib/utils';
-import { Clapperboard, Calendar, Target, FileText, Link2, MessageSquare, Loader2, ChevronDown, ChevronRight, CheckCircle } from 'lucide-react';
+import { Clapperboard, Calendar, Target, FileText, Link2, MessageSquare, Loader2, ChevronDown, ChevronRight, CheckCircle, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface TaskData {
@@ -151,6 +151,7 @@ export default function ClientContentPage() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [showPosted, setShowPosted] = useState(false);
 
   useEffect(() => {
     if (!taskId) return;
@@ -231,7 +232,9 @@ export default function ClientContentPage() {
     );
   }
 
-  const pendingCount = tasks.filter(t => t.status !== 'Postado').length;
+  const pendingTasks = tasks.filter(t => t.status !== 'Postado');
+  const postedTasks = tasks.filter(t => t.status === 'Postado');
+  const displayedTasks = showPosted ? tasks : pendingTasks;
 
   return (
     <div className="min-h-screen bg-background">
@@ -240,21 +243,35 @@ export default function ClientContentPage() {
           <img src={logoInova} alt="Inova" className="h-10" />
           <div className="text-right">
             {clientName && <p className="text-sm font-medium text-foreground">{clientName}</p>}
-            <p className="text-xs text-muted-foreground">{pendingCount} {pendingCount === 1 ? 'pendente' : 'pendentes'}</p>
+            <p className="text-xs text-muted-foreground">{pendingTasks.length} {pendingTasks.length === 1 ? 'pendente' : 'pendentes'}</p>
           </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-3xl px-6 py-8">
-        <div className="mb-6">
-          <h1 className="text-xl font-bold text-foreground">Cronograma de Conteúdo</h1>
-          <p className="text-sm text-muted-foreground">Confirme as postagens conforme forem sendo publicadas</p>
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-bold text-foreground">Cronograma de Conteúdo</h1>
+            <p className="text-sm text-muted-foreground">Confirme as postagens conforme forem sendo publicadas</p>
+          </div>
+          {postedTasks.length > 0 && (
+            <button
+              onClick={() => setShowPosted(!showPosted)}
+              className="text-sm text-primary hover:underline"
+            >
+              {showPosted ? 'Ocultar publicados' : `Ver ${postedTasks.length} publicados`}
+            </button>
+          )}
         </div>
 
         <div className="space-y-4">
-          {tasks.map((task, i) => (
-            <TaskCard key={task.id} task={task} index={i} onConfirm={handleConfirmPost} confirming={confirmingId === task.id} />
-          ))}
+          {displayedTasks.length === 0 ? (
+            <p className="text-center text-muted-foreground py-8">Nenhuma tarefa pendente!</p>
+          ) : (
+            displayedTasks.map((task, i) => (
+              <TaskCard key={task.id} task={task} index={i} onConfirm={handleConfirmPost} confirming={confirmingId === task.id} />
+            ))
+          )}
         </div>
 
         <div className="mt-12 border-t border-border pt-6 text-center">
