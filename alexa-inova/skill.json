@@ -1,0 +1,27 @@
+{
+  "interactionModels": {
+    "pt-BR": {
+      "languageModel": {
+        "invocationName": "nova",
+        "intents": [
+          {
+            "name": "CriarTarefaIntent",
+            "slots": [{"name": "titulo", "type": "AMAZON.SearchQuery"}]
+          },
+          {
+            "name": "ListarTarefasIntent"
+          },
+          {
+            "name": "ListarClientesIntent"
+          },
+          {
+            "name": "CriarClienteIntent",
+            "slots": [{"name": "nome", "type": "AMAZON.Person"}]
+          },
+          {"name": "AMAZON.HelpIntent"},
+          {"name": "AMAZON.StopIntent"}
+        ]
+      }
+    }
+  }
+}

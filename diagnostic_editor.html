@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editor de Diagnóstico Estratégico — iNØVA Co.</title>
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --teal: #0D6E5E; --teal-dark: #095045; --burgundy: #3A0A1E;
+            --lime: #B8F000; --cream: #F2ECD8; --white: #FAFAF8; --light-bg: #F5F3EE;
+            --sidebar-bg: #111111; --input-bg: #1e1e1e; --border: #2a2a2a;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'DM Sans', sans-serif; display: flex; height: 100vh; overflow: hidden; background: var(--sidebar-bg); color: var(--cream); }
+        
+        /* Sidebar */
+        #editor-panel { width: 35%; height: 100%; overflow-y: auto; border-right: 1px solid var(--border); display: flex; flex-direction: column; }
+        .sidebar-header { background: var(--teal); padding: 16px 20px; font-family: 'Bebas Neue'; font-size: 1.4rem; color: var(--lime); letter-spacing: 3px; position: sticky; top: 0; z-index: 10; display: flex; justify-content: space-between; align-items: center; }
+        .actions { display: flex; gap: 10px; padding: 10px 20px; background: #1a1a1a; border-bottom: 1px solid var(--border); }
+        .btn { padding: 8px 12px; border-radius: 4px; border: none; font-family: 'Syne'; font-size: 0.7rem; font-weight: 700; cursor: pointer; text-transform: uppercase; letter-spacing: 1px; transition: 0.2s; display: flex; align-items: center; gap: 5px; }
+        .btn-primary { background: var(--lime); color: var(--burgundy); }
+        .btn-secondary { background: #333; color: white; }
+        .btn-danger { background: rgba(255,80,80,0.1); color: #ff5050; border: 1px solid rgba(255,80,80,0.2); }
+        .btn:hover { opacity: 0.8; }
+        
+        .progress-bar-container { height: 4px; background: #222; width: 100%; }
+        .progress-bar { height: 100%; background: var(--lime); width: 0%; transition: 0.5s; }
+
+        /* Accordion */
+        .section { border-bottom: 1px solid var(--border); }
+        .section-header { background: #1a1a1a; padding: 14px 20px; cursor: pointer; font-family: 'Syne'; font-size: 0.75rem; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--cream); display: flex; justify-content: space-between; align-items: center; }
+        .section-header:hover { background: #222; }
+        .section.active { border-left: 3px solid var(--lime); }
+        .section.active .section-header { color: var(--lime); }
+        .section-content { display: none; padding: 20px; background: #151515; }
+        .section.active .section-content { display: block; }
+
+        .field { margin-bottom: 15px; }
+        .field label { display: block; font-family: 'Syne'; font-size: 0.65rem; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: rgba(242,236,216,0.5); margin-bottom: 6px; }
+        .field input, .field textarea, .field select { width: 100%; background: var(--input-bg); border: 1px solid #333; border-radius: 3px; padding: 10px; color: var(--cream); font-family: 'DM Sans'; font-size: 0.85rem; outline: none; transition: 0.2s; }
+        .field input:focus, .field textarea:focus { border-color: var(--lime); }
+        .field textarea { min-height: 80px; resize: vertical; }
+        
+        .dynamic-item { background: #1e1e1e; padding: 15px; border-radius: 5px; margin-bottom: 10px; position: relative; border: 1px solid #333; }
+        .remove-btn { position: absolute; top: 10px; right: 10px; color: rgba(255,80,80,0.5); cursor: pointer; font-size: 0.7rem; border: none; background: none; }
+        .add-btn { background: transparent; border: 1px dashed #333; color: rgba(242,236,216,0.4); padding: 10px; width: 100%; font-family: 'Syne'; font-size: 0.7rem; letter-spacing: 1px; cursor: pointer; margin-top: 5px; }
+        .add-btn:hover { border-color: var(--lime); color: var(--lime); }
+
+        /* Preview */
+        #preview-panel { width: 65%; height: 100%; overflow-y: auto; background: white; position: relative; scroll-behavior: smooth; }
+        .preview-container { min-height: 100%; background: var(--white); transform-origin: top center; transition: 0.3s; }
+        .preview-mobile { width: 375px; margin: 40px auto; box-shadow: 0 20px 50px rgba(0,0,0,0.2); border-radius: 30px; border: 12px solid #111; height: 812px; overflow-y: auto; }
+        
+        /* Landing Page Styles */
+        .lp-section { position: relative; padding: 80px 40px; }
+        .bebas { font-family: 'Bebas Neue', sans-serif; }
+        .syne { font-family: 'Syne', sans-serif; }
+        .placeholder { font-style: italic; color: rgba(0,0,0,0.2) !important; }
+        
+        .hero { background: var(--teal); color: white; min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; overflow: hidden; }
+        .hero-title { font-size: 10rem; line-height: 0.8; letter-spacing: -2px; margin: 20px 0; }
+        .hero-segment { font-size: 8rem; color: var(--lime); margin-top: -20px; }
+        .hero-eyebrow { font-family: 'Syne'; font-size: 0.8rem; letter-spacing: 5px; text-transform: uppercase; color: var(--cream); margin-bottom: 10px; }
+        .hero-subtitle { font-family: 'Syne'; font-size: 1rem; color: var(--cream); opacity: 0.8; letter-spacing: 2px; }
+        .decor { position: absolute; font-size: 10rem; opacity: 0.1; color: white; pointer-events: none; }
+        
+        .divider { height: 10px; background: linear-gradient(90deg, var(--teal), var(--lime), var(--burgundy)); width: 100%; }
+        
+        .intro { background: var(--light-bg); display: grid; grid-template-cols: 1fr 1fr; gap: 60px; align-items: center; }
+        .intro h2 { font-family: 'Syne'; font-size: 2.5rem; color: var(--burgundy); line-height: 1.1; font-weight: 800; }
+        .intro p { font-size: 1.1rem; color: #444; line-height: 1.6; }
+
+        .positives { background: white; }
+        .tag { display: inline-block; padding: 6px 12px; font-family: 'Syne'; font-size: 0.6rem; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 15px; border-radius: 2px; }
+        .tag-teal { background: var(--teal); color: white; }
+        .tag-lime { background: var(--lime); color: var(--burgundy); }
+        .lp-title { font-size: 4rem; color: var(--burgundy); line-height: 1; margin-bottom: 40px; }
+        .card-grid { display: grid; grid-template-cols: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; }
+        .card-positive { background: var(--teal); color: white; padding: 30px; border-radius: 10px; }
+        .card-positive h3 { font-family: 'Syne'; font-size: 1.2rem; margin-bottom: 15px; color: var(--lime); }
+        
+        .negatives { background: var(--burgundy); color: var(--cream); }
+        .negatives .lp-title { color: var(--cream); }
+        .negative-item { display: grid; grid-template-cols: 80px 1fr; gap: 20px; margin-bottom: 40px; align-items: start; }
+        .neg-num { font-family: 'Bebas Neue'; font-size: 5rem; color: var(--lime); opacity: 0.3; line-height: 0.8; }
+        .neg-badge { font-family: 'Syne'; font-size: 0.6rem; font-weight: 800; padding: 4px 8px; border-radius: 4px; text-transform: uppercase; margin-left: 10px; }
+        .badge-critical { background: #ff5050; color: white; }
+        .badge-important { background: #ff9000; color: white; }
+        .badge-attention { background: #ffcc00; color: black; }
+        .neg-correction { margin-top: 15px; color: var(--lime); font-style: italic; border-left: 2px solid var(--lime); padding-left: 15px; }
+
+        .bio-analysis { background: var(--cream); display: grid; grid-template-cols: 1fr 1fr; gap: 0; padding: 0 !important; }
+        .bio-col { padding: 60px 40px; }
+        .bio-pos { background: var(--teal); color: white; }
+        .bio-neg { background: #1a1a1a; color: white; }
+        .bio-col h3 { font-family: 'Syne'; font-size: 2rem; margin-bottom: 30px; text-transform: uppercase; font-weight: 800; }
+        .bio-list { list-style: none; }
+        .bio-list li { margin-bottom: 15px; display: flex; gap: 10px; align-items: start; }
+        .bio-list li::before { content: '→'; color: var(--lime); font-weight: bold; }
+
+        .final-diag { background: var(--teal-dark); color: white; text-align: center; }
+        .final-diag h2 { font-family: 'Bebas Neue'; font-size: 6rem; line-height: 0.9; margin-bottom: 40px; }
+        .lime-text { color: var(--lime); }
+        .actions-list { max-width: 700px; margin: 60px auto 0; text-align: left; }
+        .action-item { border-left: 4px solid var(--lime); padding: 20px; background: rgba(255,255,255,0.05); margin-bottom: 15px; font-family: 'Syne'; font-weight: 600; font-size: 1.1rem; }
+
+        .pilares { background: var(--light-bg); display: grid; grid-template-cols: repeat(4, 1fr); gap: 10px; padding: 20px !important; }
+        .pilar { padding: 40px 20px; text-align: center; color: white; font-family: 'Syne'; font-weight: 800; text-transform: uppercase; font-size: 0.8rem; letter-spacing: 2px; }
+
+        .weeks { background: var(--burgundy); color: white; }
+        .week-block { margin-bottom: 60px; }
+        .week-header { border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: flex-end; }
+        .week-label { font-family: 'Syne'; font-size: 0.8rem; font-weight: 800; color: var(--lime); margin-bottom: 5px; }
+        .week-title { font-family: 'Bebas Neue'; font-size: 3rem; }
+        .content-grid { display: grid; grid-template-cols: 1fr 1fr; gap: 30px; }
+        .content-card { background: #222; border-radius: 15px; overflow: hidden; border-top: 5px solid white; }
+        .card-inner { padding: 25px; }
+        .card-type { font-family: 'Syne'; font-size: 0.6rem; font-weight: 800; text-transform: uppercase; opacity: 0.5; margin-bottom: 10px; }
+        .card-title { font-family: 'Syne'; font-size: 1.2rem; font-weight: 800; margin-bottom: 15px; color: var(--lime); }
+        .card-detail { margin-bottom: 15px; font-size: 0.9rem; }
+        .detail-label { display: block; font-size: 0.6rem; text-transform: uppercase; color: var(--cream); opacity: 0.5; margin-bottom: 4px; font-weight: bold; }
+        .cta-box { background: var(--cream); color: var(--burgundy); font-weight: bold; padding: 10px; border-radius: 5px; text-align: center; font-family: 'Syne'; font-size: 0.7rem; }
+
+        .cta-final { background: var(--lime); color: var(--burgundy); text-align: center; }
+        .cta-final h2 { font-family: 'Bebas Neue'; font-size: 8rem; line-height: 0.8; margin-bottom: 20px; }
+        .cta-btn { display: inline-block; background: var(--burgundy); color: white; padding: 20px 60px; border-radius: 100px; font-family: 'Syne'; font-weight: 800; text-decoration: none; font-size: 1.1rem; margin-top: 40px; transition: 0.3s; }
+        .cta-btn:hover { transform: scale(1.05); }
+
+        footer { background: var(--burgundy); padding: 60px; text-align: center; color: rgba(242,236,216,0.3); border-top: 1px solid rgba(255,255,255,0.05); }
+
+        /* Helpers */
+        .editable-highlight:hover { outline: 1px dashed var(--lime); outline-offset: 4px; }
+        
+        @media (max-width: 900px) {
+            body { flex-direction: column; overflow: auto; }
+            #editor-panel { width: 100%; height: auto; border-right: none; position: fixed; transform: translateX(-100%); transition: 0.4s; z-index: 100; background: #000; }
+            #editor-panel.open { transform: translateX(0); height: 100vh; }
+            #preview-panel { width: 100%; height: auto; }
+            .mobile-toggle { display: block !important; position: fixed; bottom: 20px; left: 20px; z-index: 110; width: 60px; height: 60px; border-radius: 50%; background: var(--lime); color: var(--burgundy); border: none; font-size: 1.5rem; display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        }
+    </style>
+</head>
+<body>
+    <button class="mobile-toggle" style="display:none;" onclick="document.getElementById('editor-panel').classList.toggle('open')">☰</button>
+
+    <aside id="editor-panel">
+        <header class="sidebar-header">
+            iNØVA Co.
+            <span id="progress-text" style="font-family:'Syne'; font-size:0.6rem; opacity:0.6">0/0 CAMPOS</span>
+        </header>
+        <div class="progress-bar-container"><div id="progress-bar" class="progress-bar"></div></div>
+        
+        <div class="actions">
+            <button class="btn btn-primary" onclick="toggleView()">👁 Preview</button>
+            <button class="btn btn-secondary" onclick="exportHTML()">⬇ Exportar</button>
+            <button class="btn btn-danger" onclick="clearAll()">🗑 Limpar</button>
+        </div>
+
+        <div id="form-container">
+            <!-- Sections will be injected here -->
+        </div>
+    </aside>
+
+    <main id="preview-panel">
+        <div id="preview-container" class="preview-container">
+            <!-- Landing Page segments -->
+            <div id="lp-content"></div>
+        </div>
+    </main>
+
+    <script>
+        const DEFAULT_DATA = {
+            cliente: { nome: '', nicho: '', subtitulo: '', tema: 'teal' },
+            intro: { titulo: '', texto: '' },
+            positivos: [],
+            negativos: [],
+            bio: { pos1: '', pos2: '', neg1: '', neg2: '', neg3: '' },
+            final: { destaque: '', texto: '', acao1: '', acao2: '', acao3: '', acao4: '', acao5: '' },
+            semanas: [
+                { label: 'Semana 1', titulo: '', destaque: '', cards: [{tipo:'Alcance', titulo:'', gancho:'', estrutura:'', cta:''}, {tipo:'Conversão', titulo:'', gancho:'', estrutura:'', cta:''}] },
+                { label: 'Semana 2', titulo: '', destaque: '', cards: [{tipo:'Autoridade', titulo:'', gancho:'', estrutura:'', cta:''}, {tipo:'Engajamento', titulo:'', gancho:'', estrutura:'', cta:''}] },
+                { label: 'Semana 3', titulo: '', destaque: '', cards: [{tipo:'Vendas', titulo:'', gancho:'', estrutura:'', cta:''}, {tipo:'Alcance', titulo:'', gancho:'', estrutura:'', cta:''}] }
+            ],
+            cta: { linha1: '', linha2: '', texto: '', btnTexto: '', btnLink: '' }
+        };
+
+        let state = JSON.parse(localStorage.getItem('inova_diag_data')) || DEFAULT_DATA;
+        let activeView = 'desktop';
+
+        const formStructure = [
+            { id: 'cliente', label: 'Dados do Cliente', fields: [
+                { key: 'nome', label: 'Nome do Perfil (@)', placeholder: '@tulumlounge' },
+                { key: 'nicho', label: 'Segmento/Nicho', placeholder: 'Restaurante · Lounge' },
+                { key: 'subtitulo', label: 'Subtítulo do Hero', placeholder: 'Posicionamento · Presença Digital' },
+                { key: 'tema', label: 'Cor do Tema', type: 'select', options: ['Verde Teal', 'Bordô', 'Preto'] }
+            ]},
+            { id: 'intro', label: 'Introdução', fields: [
+                { key: 'titulo', label: 'Título da Intro', placeholder: 'Por que seu perfil não converte?' },
+                { key: 'texto', label: 'Texto de Introdução', type: 'textarea', placeholder: 'Descreva o objetivo...' }
+            ]},
+            { id: 'positivos', label: 'Pontos Positivos', dynamic: true, max: 6, fields: [
+                { key: 'titulo', label: 'Título do Ponto', placeholder: 'Nicho bem definido' },
+                { key: 'texto', label: 'Descrição', type: 'textarea', placeholder: 'O perfil é identificado como...' }
+            ]},
+            { id: 'negativos', label: 'Pontos Negativos', dynamic: true, max: 9, fields: [
+                { key: 'titulo', label: 'Título do Problema', placeholder: 'Falta de posicionamento' },
+                { key: 'gravidade', label: 'Gravidade', type: 'select', options: ['Crítico', 'Importante', 'Atenção'] },
+                { key: 'desc', label: 'Descrição do Problema', type: 'textarea' },
+                { key: 'correcao', label: 'Texto de Correção', type: 'textarea' }
+            ]},
+            { id: 'bio', label: 'Análise da Bio', fields: [
+                { key: 'pos1', label: 'Ponto Positivo 1', type: 'textarea' },
+                { key: 'pos2', label: 'Ponto Positivo 2', type: 'textarea' },
+                { key: 'neg1', label: 'Ponto Negativo 1', type: 'textarea' },
+                { key: 'neg2', label: 'Ponto Negativo 2', type: 'textarea' },
+                { key: 'neg3', label: 'Ponto Negativo 3', type: 'textarea' }
+            ]},
+            { id: 'final', label: 'Diagnóstico Final', fields: [
+                { key: 'destaque', label: 'Palavra Destaque (Lime)', placeholder: 'MAS NÃO CONVERTE' },
+                { key: 'texto', label: 'Resumo Estratégico', type: 'textarea' },
+                { key: 'acao1', label: 'Ação 1' }, { key: 'acao2', label: 'Ação 2' }, { key: 'acao3', label: 'Ação 3' }, { key: 'acao4', label: 'Ação 4' }, { key: 'acao5', label: 'Ação 5' }
+            ]},
+            { id: 'semanas', label: 'Plano de Ação', isWeeks: true },
+            { id: 'cta', label: 'CTA Final', fields: [
+                { key: 'linha1', label: 'Texto Linha 1', placeholder: 'O OURO' },
+                { key: 'linha2', label: 'Texto Linha 2', placeholder: 'ESTÁ' },
+                { key: 'texto', label: 'Parágrafo Final', type: 'textarea' },
+                { key: 'btnTexto', label: 'Texto do Botão' },
+                { key: 'btnLink', label: 'Link do Botão' }
+            ]}
+        ];
+
+        function init() {
+            renderForm();
+            renderPreview();
+            updateProgress();
+            
+            // Auto-save
+            setInterval(() => {
+                localStorage.setItem('inova_diag_data', JSON.stringify(state));
+            }, 2000);
+        }
+
+        function renderForm() {
+            const container = document.getElementById('form-container');
+            container.innerHTML = '';
+            
+            formStructure.forEach((sec, idx) => {
+                const sectionEl = document.createElement('div');
+                sectionEl.className = `section ${idx === 0 ? 'active' : ''}`;
+                
+                const header = document.createElement('div');
+                header.className = 'section-header';
+                header.innerHTML = `${sec.label} <span>${idx === 0 ? '−' : '+'}</span>`;
+                header.onclick = () => {
+                    const isActive = sectionEl.classList.contains('active');
+                    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+                    document.querySelectorAll('.section-header span').forEach(s => s.textContent = '+');
+                    if (!isActive) {
+                        sectionEl.classList.add('active');
+                        header.querySelector('span').textContent = '−';
+                    }
+                };
+                
+                const content = document.createElement('div');
+                content.className = 'section-content';
+                
+                if (sec.isWeeks) {
+                    renderWeeksEditor(content);
+                } else if (sec.dynamic) {
+                    renderDynamicEditor(sec, content);
+                } else {
+                    sec.fields.forEach(f => {
+                        const fieldEl = createField(sec.id, f, state[sec.id][f.key], (val) => {
+                            state[sec.id][f.key] = val;
+                            renderPreview();
+                            updateProgress();
+                        });
+                        content.appendChild(fieldEl);
+                    });
+                }
+                
+                sectionEl.appendChild(header);
+                sectionEl.appendChild(content);
+                container.appendChild(sectionEl);
+            });
+        }
+
+        function createField(secId, f, value, onChange) {
+            const wrap = document.createElement('div');
+            wrap.className = 'field';
+            const label = document.createElement('label');
+            label.textContent = f.label;
+            
+            let input;
+            if (f.type === 'textarea') {
+                input = document.createElement('textarea');
+            } else if (f.type === 'select') {
+                input = document.createElement('select');
+                f.options.forEach(opt => {
+                    const o = document.createElement('option');
+                    o.value = opt.toLowerCase().includes('teal') ? 'teal' : opt.toLowerCase().includes('bord') ? 'burgundy' : 'black';
+                    if (f.key === 'gravidade') o.value = opt.toLowerCase();
+                    o.textContent = opt;
+                    input.appendChild(o);
+                });
+            } else {
+                input = document.createElement('input');
+                input.type = 'text';
+            }
+            
+            input.placeholder = f.placeholder || '';
+            input.value = value || '';
+            input.oninput = (e) => onChange(e.target.value);
+            
+            wrap.appendChild(label);
+            wrap.appendChild(input);
+            return wrap;
+        }
+
+        function renderDynamicEditor(sec, container) {
+            container.innerHTML = '';
+            state[sec.id].forEach((item, index) => {
+                const itemEl = document.createElement('div');
+                itemEl.className = 'dynamic-item';
+                itemEl.innerHTML = `<button class="remove-btn" onclick="removeItem('${sec.id}', ${index})">✕ remover</button>`;
+                
+                sec.fields.forEach(f => {
+                    const fieldEl = createField(sec.id, f, item[f.key], (val) => {
+                        state[sec.id][index][f.key] = val;
+                        renderPreview();
+                        updateProgress();
+                    });
+                    itemEl.appendChild(fieldEl);
+                });
+                container.appendChild(itemEl);
+            });
+            
+            if (state[sec.id].length < sec.max) {
+                const addBtn = document.createElement('button');
+                addBtn.className = 'add-btn';
+                addBtn.textContent = `+ Adicionar ${sec.label.slice(0, -1)}`;
+                addBtn.onclick = () => {
+                    const newItem = {};
+                    sec.fields.forEach(f => newItem[f.key] = '');
+                    state[sec.id].push(newItem);
+                    renderForm();
+                };
+                container.appendChild(addBtn);
+            }
+        }
+
+        function renderWeeksEditor(container) {
+            state.semanas.forEach((w, wIdx) => {
+                const wWrap = document.createElement('div');
+                wWrap.style.marginBottom = '30px';
+                wWrap.innerHTML = `<div style="font-family:'Syne'; font-size:0.6rem; color:var(--lime); margin-bottom:10px">${w.label}</div>`;
+                
+                const f1 = createField('semanas', {key:'titulo', label:'Título da Semana'}, w.titulo, v => { state.semanas[wIdx].titulo = v; renderPreview(); updateProgress(); });
+                const f2 = createField('semanas', {key:'destaque', label:'Destaque (Lime)'}, w.destaque, v => { state.semanas[wIdx].destaque = v; renderPreview(); updateProgress(); });
+                wWrap.appendChild(f1); wWrap.appendChild(f2);
+                
+                w.cards.forEach((c, cIdx) => {
+                    const cWrap = document.createElement('div');
+                    cWrap.className = 'dynamic-item';
+                    cWrap.innerHTML = `<div style="font-family:'Syne'; font-size:0.55rem; color:rgba(255,255,255,0.3); margin-bottom:10px">CARD ${cIdx+1}</div>`;
+                    
+                    const fields = [
+                        {key:'tipo', label:'Tipo', type:'select', options:['Autoridade', 'Alcance', 'Engajamento', 'Vendas', 'Conversão']},
+                        {key:'titulo', label:'Tópico/Título'},
+                        {key:'gancho', label:'Gancho', type:'textarea'},
+                        {key:'estrutura', label:'Estrutura', type:'textarea'},
+                        {key:'cta', label:'CTA', type:'textarea'}
+                    ];
+                    
+                    fields.forEach(f => {
+                        const fieldEl = createField('semanas', f, c[f.key], v => {
+                            state.semanas[wIdx].cards[cIdx][f.key] = v;
+                            renderPreview();
+                            updateProgress();
+                        });
+                        cWrap.appendChild(fieldEl);
+                    });
+                    wWrap.appendChild(cWrap);
+                });
+                container.appendChild(wWrap);
+            });
+        }
+
+        function removeItem(secId, index) {
+            state[secId].splice(index, 1);
+            renderForm();
+            renderPreview();
+            updateProgress();
+        }
+
+        function renderPreview() {
+            const container = document.getElementById('lp-content');
+            const data = state;
+            
+            const t = (val, place) => val ? val : `<span class="placeholder">${place}</span>`;
+
+            container.innerHTML = `
+                <div class="hero editable-highlight" style="background:${data.cliente.tema === 'burgundy' ? 'var(--burgundy)' : data.cliente.tema === 'black' ? '#000' : 'var(--teal)'}">
+                    <div class="decor" style="top:10%; left:10%">✳</div>
+                    <div class="decor" style="bottom:15%; right:10%">✦</div>
+                    <div style="font-family:'Syne'; font-weight:800; font-size:1.5rem; position:absolute; top:40px; left:40px">iNØVA Co.</div>
+                    <p class="hero-eyebrow">Diagnóstico Estratégico de Marca · ${t(data.cliente.nome, '@nomedocliente')}</p>
+                    <h1 class="hero-title bebas">DIAGNÓSTICO</h1>
+                    <h1 class="hero-segment bebas">${t(data.cliente.nicho, '[SEGMENTO]')}</h1>
+                    <p class="hero-subtitle">${t(data.cliente.subtitulo, '[subtítulo do hero]')}</p>
+                </div>
+                <div class="divider"></div>
+                <section class="lp-section intro editable-highlight">
+                    <div><h2>${t(data.intro.titulo, '[Título Intro]')}</h2></div>
+                    <div><p>${t(data.intro.texto, '[Texto de introdução do diagnóstico...]')}</p></div>
+                </section>
+                <section class="lp-section positives">
+                    <span class="tag tag-teal">Análise da Presença Digital</span>
+                    <h2 class="lp-title bebas">Pontos Positivos</h2>
+                    <div class="card-grid">
+                        ${data.positivos.length ? data.positivos.map(p => `
+                            <div class="card-positive editable-highlight">
+                                <h3>${t(p.titulo, '[Título]')}</h3>
+                                <p>${t(p.texto, '[Descrição do ponto positivo]')}</p>
+                            </div>
+                        `).join('') : '<div class="card-positive"><i>Ainda sem pontos...</i></div>'}
+                    </div>
+                </section>
+                <section class="lp-section negatives">
+                    <span class="tag tag-lime">Análise da Presença Digital</span>
+                    <h2 class="lp-title bebas">Pontos Negativos</h2>
+                    <div>
+                        ${data.negativos.length ? data.negativos.map((n, i) => `
+                            <div class="negative-item editable-highlight">
+                                <div class="neg-num">${String(i + 1).padStart(2, '0')}</div>
+                                <div>
+                                    <div style="display:flex; align-items:center; margin-bottom:10px">
+                                        <h3 class="syne" style="font-size:1.5rem; font-weight:800">${t(n.titulo, '[Título do Problema]')}</h3>
+                                        <span class="neg-badge badge-${n.gravidade || 'attention'}">${n.gravidade || 'Atenção'}</span>
+                                    </div>
+                                    <p style="opacity:0.8">${t(n.desc, '[Descrição do problema mapeado]')}</p>
+                                    <div class="neg-correction"><b>Correção:</b> ${t(n.correcao, '[Ação corretiva sugerida]')}</div>
+                                </div>
+                            </div>
+                        `).join('') : '<i>Sem pontos negativos...</i>'}
+                    </div>
+                </section>
+                <section class="bio-analysis">
+                    <div class="bio-col bio-pos editable-highlight">
+                        <h3 class="syne">Bio Positiva</h3>
+                        <ul class="bio-list">
+                            <li>${t(data.bio.pos1, 'Ponto positivo 1')}</li>
+                            <li>${t(data.bio.pos2, 'Ponto positivo 2')}</li>
+                        </ul>
+                    </div>
+                    <div class="bio-col bio-neg editable-highlight">
+                        <h3 class="syne">Melhorias</h3>
+                        <ul class="bio-list">
+                            <li>${t(data.bio.neg1, 'Ponto negativo 1')}</li>
+                            <li>${t(data.bio.neg2, 'Ponto negativo 2')}</li>
+                            <li>${t(data.bio.neg3, 'Ponto negativo 3')}</li>
+                        </ul>
+                    </div>
+                </section>
+                <section class="lp-section final-diag">
+                    <h2 class="bebas">O <span class="lime-text">DIAGNÓSTICO</span></h2>
+                    <h2 class="bebas" style="margin-top:-30px">${t(data.final.destaque, '[DESTAQUE]')}</h2>
+                    <p style="max-width:800px; margin:0 auto; font-size:1.4rem; opacity:0.9">${t(data.final.texto, '[Resumo estratégico]')}</p>
+                    <div class="actions-list">
+                        ${[1,2,3,4,5].map(i => data.final['acao'+i] ? `<div class="action-item">${data.final['acao'+i]}</div>` : '').join('')}
+                    </div>
+                </section>
+                <div class="pilares">
+                    <div class="pilar" style="background:var(--burgundy)">Posicionamento</div>
+                    <div class="pilar" style="background:var(--teal)">Autoridade</div>
+                    <div class="pilar" style="background:#000">Presença Digital</div>
+                    <div class="pilar" style="background:var(--lime); color:var(--burgundy)">Conversão</div>
+                </div>
+                <section class="lp-section weeks">
+                    ${data.semanas.map(w => `
+                        <div class="week-block">
+                            <div class="week-header">
+                                <div><div class="week-label">${w.label}</div><h2 class="week-title">${t(w.titulo, '[TITULO SEMANA]')} <span class="lime-text">${t(w.destaque, '')}</span></h2></div>
+                            </div>
+                            <div class="content-grid">
+                                ${w.cards.map(c => `
+                                    <div class="content-card editable-highlight" style="border-top-color:${getColor(c.tipo)}">
+                                        <div class="card-inner">
+                                            <div class="card-type">${c.tipo}</div>
+                                            <h4 class="card-title">${t(c.titulo, '[Título Conteúdo]')}</h4>
+                                            <div class="card-detail"><span class="detail-label">Gancho</span>${t(c.gancho, '...')}</div>
+                                            <div class="card-detail"><span class="detail-label">Estrutura</span>${t(c.estrutura, '...')}</div>
+                                            <div class="cta-box">CTA: ${t(c.cta, '[Call to Action]')}</div>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `).join('')}
+                </section>
+                <section class="lp-section cta-final">
+                    <h2 class="bebas">${t(data.cta.linha1, '[LINHA 1]')}</h2>
+                    <h2 class="bebas" style="margin-top:-60px">${t(data.cta.linha2, '[LINHA 2]')}</h2>
+                    <p style="font-size:1.5rem; font-weight:700">${t(data.cta.texto, '[Mensagem final...]')}</p>
+                    <a href="${data.cta.btnLink || '#'}" class="cta-btn">${t(data.cta.btnTexto, 'Começar agora')}</a>
+                </section>
+                <footer>
+                    <div style="font-family:'Syne'; font-weight:800; font-size:1.2rem; color:var(--cream); margin-bottom:10px">iNØVA Co.</div>
+                    <p>Diagnóstico Estratégico de Marca Especialmente Desenvolvido para ${t(data.cliente.nome, 'Cliente')}</p>
+                </footer>
+            `;
+        }
+
+        function getColor(tipo) {
+            const map = { 'Autoridade': 'var(--burgundy)', 'Alcance': 'var(--teal)', 'Conversão': 'var(--lime)', 'Vendas': '#000', 'Engajamento': '#444' };
+            return map[tipo] || 'white';
+        }
+
+        function updateProgress() {
+            let total = 0; let filled = 0;
+            const count = (obj) => {
+                for (let k in obj) {
+                    if (typeof obj[k] === 'object') count(obj[k]);
+                    else { total++; if (obj[k]) filled++; }
+                }
+            };
+            count(state);
+            const perc = (filled / total) * 100;
+            document.getElementById('progress-bar').style.width = perc + '%';
+            document.getElementById('progress-text').textContent = `${filled}/${total} CAMPOS`;
+        }
+
+        function toggleView() {
+            activeView = activeView === 'desktop' ? 'mobile' : 'desktop';
+            document.getElementById('preview-container').className = activeView === 'mobile' ? 'preview-container preview-mobile' : 'preview-container';
+        }
+
+        function clearAll() {
+            if (confirm('Tem certeza? Isso apagará todo o progresso.')) {
+                state = JSON.parse(JSON.stringify(DEFAULT_DATA));
+                localStorage.removeItem('inova_diag_data');
+                renderForm();
+                renderPreview();
+                updateProgress();
+            }
+        }
+
+        function exportHTML() {
+            const markup = document.getElementById('lp-content').innerHTML;
+            const css = document.querySelector('style').innerHTML;
+            const fonts = `<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">`;
+            
+            // Clean placeholders
+            const cleanMarkup = markup.replace(/<span class="placeholder">.*?<\/span>/g, '');
+            
+            const fullHTML = `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagnóstico Estratégico — ${state.cliente.nome || 'iNOVA Co.'}</title>
+    ${fonts}
+    <style>${css}</style>
+</head>
+<body style="background:var(--white); overflow-x:hidden;">
+    <div class="preview-container">${cleanMarkup}</div>
+</body>
+</html>`;
+            
+            const blob = new Blob([fullHTML], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `diagnostico-${state.cliente.nome.replace('@','') || 'inova'}.html`;
+            a.click();
+        }
+
+        init();
+    </script>
+</body>
+</html>
