@@ -75,7 +75,7 @@ export default function ClientPortalPage() {
           .from('content_ideas')
           .select('*')
           .eq('client_id', clientId)
-          //.not('scheduled_date', 'is', null) // We will filter locally to avoid weird RLS null checks
+          .not('status', 'eq', 'Postado')
           .order('scheduled_date', { ascending: true });
           
         if (ideasData && ideasData.length > 0) {

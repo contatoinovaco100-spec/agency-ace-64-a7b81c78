@@ -275,6 +275,9 @@ export default function ClientContentPage() {
   }
 
   const pendingTasks = tasks.filter(t => {
+    // Always show the task that matches the taskId in the URL
+    if (taskId && t.id === taskId) return true;
+    
     if (t.status === 'Postado') return false;
     const taskDate = t.scheduled_date || t.due_date;
     if (!taskDate) return true;
