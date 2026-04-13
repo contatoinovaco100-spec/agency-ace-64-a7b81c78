@@ -304,7 +304,7 @@ export default function ClientContentPage() {
       <main className="mx-auto max-w-3xl px-6 py-8">
         <div className="mb-6 flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold text-foreground">Cronograma de Conteúdo</h1>
+            <h1 className="text-xl font-bold text-foreground">Cronograma de Conteúdo (Atualizado)</h1>
             <p className="text-sm text-muted-foreground">Confirme as postagens conforme forem sendo publicadas</p>
           </div>
           {postedTasks.length > 0 && (
