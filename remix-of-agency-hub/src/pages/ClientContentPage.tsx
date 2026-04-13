@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import logoInova from '@/assets/logo-inova.png';
 import { cn } from '@/lib/utils';
-import { Clapperboard, Calendar, Target, FileText, Link2, MessageSquare, Loader2, ChevronDown, ChevronRight, CheckCircle } from 'lucide-react';
+import { Clapperboard, Calendar, Target, FileText, Link2, MessageSquare, Loader2, ChevronDown, ChevronRight, CheckCircle, CalendarCheck } from 'lucide-react';
 
 interface TaskData {
   id: string;
@@ -27,14 +27,16 @@ interface TaskData {
   strategic_notes: string;
 }
 
-function TaskCard({ task, index, onConfirm }: { task: TaskData; index: number; onConfirm: (taskId: string) => void }) {
+function TaskCard({ task, index, onConfirm, onSchedule }: { task: TaskData; index: number; onConfirm: (taskId: string) => void; onSchedule: (taskId: string) => void }) {
   const [open, setOpen] = useState(index === 0);
   const videoName = task.video_name || task.title || 'Sem título';
   
   const isPosted = task.status === 'Postado';
+  const isScheduled = task.status === 'Programado';
   const hasDueDate = task.due_date;
   const isPastDue = hasDueDate ? new Date(task.due_date!) < new Date() : false;
-  const isHidden = isPosted && isPastDue;
+  const canSchedule = !isPosted && !isScheduled && hasDueDate;
+  const canConfirm = !isPosted;
 
   const sections = [
     { icon: Target, label: 'Objetivo', content: task.video_objective },
@@ -79,13 +81,24 @@ function TaskCard({ task, index, onConfirm }: { task: TaskData; index: number; o
               </span>
             )}
             {!isPosted && (
-              <button
-                onClick={(e) => { e.stopPropagation(); onConfirm(task.id); }}
-                className="flex items-center gap-1 rounded-full bg-green-500/10 px-2.5 py-0.5 text-[11px] font-medium text-green-500 hover:bg-green-500/20 transition-colors"
-              >
-                <CheckCircle className="h-3 w-3" />
-                Confirmar Postagem
-              </button>
+              <>
+                {canSchedule && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onSchedule(task.id); }}
+                    className="flex items-center gap-1 rounded-full bg-blue-500/10 px-2.5 py-0.5 text-[11px] font-medium text-blue-500 hover:bg-blue-500/20 transition-colors"
+                  >
+                    <CalendarCheck className="h-3 w-3" />
+                    Programar
+                  </button>
+                )}
+                <button
+                  onClick={(e) => { e.stopPropagation(); onConfirm(task.id); }}
+                  className="flex items-center gap-1 rounded-full bg-green-500/10 px-2.5 py-0.5 text-[11px] font-medium text-green-500 hover:bg-green-500/20 transition-colors"
+                >
+                  <CheckCircle className="h-3 w-3" />
+                  Confirmar Postagem
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -156,6 +169,26 @@ export default function ClientContentPage() {
       ));
     } catch (err) {
       console.error('Error confirming post:', err);
+    } finally {
+      setConfirmingId(null);
+    }
+  };
+
+  const handleSchedulePost = async (taskIdToSchedule: string) => {
+    setConfirmingId(taskIdToSchedule);
+    try {
+      const { error } = await supabase
+        .from('tasks')
+        .update({ status: 'Programado' })
+        .eq('id', taskIdToSchedule);
+      
+      if (error) throw error;
+      
+      setTasks(prev => prev.map(t => 
+        t.id === taskIdToSchedule ? { ...t, status: 'Programado' } : t
+      ));
+    } catch (err) {
+      console.error('Error scheduling post:', err);
     } finally {
       setConfirmingId(null);
     }
@@ -247,7 +280,7 @@ export default function ClientContentPage() {
 
         <div className="space-y-4">
           {tasks.map((task, i) => (
-            <TaskCard key={task.id} task={task} index={i} onConfirm={handleConfirmPost} />
+            <TaskCard key={task.id} task={task} index={i} onConfirm={handleConfirmPost} onSchedule={handleSchedulePost} />
           ))}
         </div>
 
