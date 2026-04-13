@@ -390,11 +390,8 @@ export default function BriefingFormPage() {
     };
 
     try {
-      // 1. Save to Google Sheets via Webhook
       const webhookUrl = WEBHOOK_CONFIG.GOOGLE_SHEETS_URL || import.meta.env.VITE_GOOGLE_SHEETS_WEBHOOK_URL;
       
-      console.log('📡 [DEBUG] Disparando Webhook para:', webhookUrl);
-
       if (webhookUrl) {
         try {
           await fetch(webhookUrl, {
@@ -405,9 +402,8 @@ export default function BriefingFormPage() {
               origem: 'Plataforma Inova (Auto-Sync)'
             }),
           });
-          console.log('🚀 [DEBUG] Webhook enviado com sucesso!');
         } catch (webhookError) {
-          console.error('❌ [DEBUG] Erro ao enviar Webhook:', webhookError);
+          console.error('Webhook error:', webhookError);
         }
       }
 

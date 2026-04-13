@@ -20,15 +20,11 @@ const SOUND_URLS: Record<NotificationSoundType, string> = {
 
 export function usePushNotification() {
   const playSound = useCallback((type: NotificationSoundType = 'default') => {
-    console.log(`🎵 Attempting to play sound: ${type}`);
     try {
       const audioUrl = SOUND_URLS[type] || SOUND_URLS.default;
       const audio = new Audio(audioUrl);
       audio.volume = type === 'sale' ? 0.8 : 0.6;
-      audio.play().then(() => {
-        console.log(`✅ Sound ${type} played successfully`);
-      }).catch(error => {
-        console.warn("❌ Audio play failed. Interaction might be required:", error);
+      audio.play().catch(() => {
         toast.info("Clique na página para ativar os alertas sonoros! 🔊", {
           position: "bottom-right",
           duration: 3000
@@ -94,7 +90,6 @@ export function usePushNotification() {
   });
 
   const primeAudio = useCallback(() => {
-    console.log("🔔 Priming audio context...");
     playSound('default');
     setIsPrimed(true);
     sessionStorage.setItem('audio_primed', 'true');

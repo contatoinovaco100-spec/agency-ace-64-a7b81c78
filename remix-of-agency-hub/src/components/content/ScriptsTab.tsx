@@ -211,7 +211,7 @@ export function ScriptsTab({ clientId }: { clientId: string }) {
           .maybeSingle();
         edLine = data;
       } catch (e) {
-        console.log("Tabela de linha editorial não existe ou não acessível, usando contexto geral.");
+        // Silently handle error - will use general context
       }
         
       const systemPrompt = `Você é um copywriter de alto nível e roteirista para redes sociais. Sua missão é criar um roteiro curto, engajador e direto ao ponto para Reels/TikTok.

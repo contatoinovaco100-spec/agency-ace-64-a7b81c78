@@ -8,10 +8,7 @@ export function RealtimeNotifications() {
   const { isAdmin } = useModuleAccess();
 
   useEffect(() => {
-    // Only admins should receive these global alerts
     if (!isAdmin) return;
-
-    console.log("🔔 Realtime listener active for contracts...");
 
     const channel = supabase
       .channel('schema-db-changes')
@@ -23,12 +20,9 @@ export function RealtimeNotifications() {
           table: 'contracts',
         },
         (payload) => {
-          console.log('🔔 Contract update received:', payload);
           const contract = payload.new;
           
-          // Trigger ONLY if status just changed to 'assinado'
           if (contract.status === 'assinado' && payload.old?.status !== 'assinado') {
-            console.log('✅ Contract signed! Triggering sound...');
             triggerNotification(
               "Venda Confirmada! 💰", 
               `O contrato "${contract.title}" foi assinado por ${contract.client_name}.`, 
@@ -46,7 +40,6 @@ export function RealtimeNotifications() {
           table: 'contract_signatures',
         },
         (payload) => {
-          console.log('🔔 New signature record received:', payload);
           const sig = payload.new;
           
           triggerNotification(
@@ -57,9 +50,7 @@ export function RealtimeNotifications() {
           );
         }
       )
-      .subscribe((status) => {
-        console.log("📡 Realtime subscription status:", status);
-      });
+      .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
