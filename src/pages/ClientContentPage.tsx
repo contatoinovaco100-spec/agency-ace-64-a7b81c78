@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { useUserRole } from '@/hooks/useUserRole';
 import logoInova from '@/assets/logo-inova.png';
 import { cn } from '@/lib/utils';
-import { Clapperboard, Calendar, Target, FileText, Link2, MessageSquare, Loader2, ChevronDown, ChevronRight, CheckCircle, Eye, EyeOff } from 'lucide-react';
+import { Clapperboard, Calendar, Target, FileText, Link2, MessageSquare, Loader2, ChevronDown, ChevronRight, CheckCircle, Eye, EyeOff, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface TaskData {
@@ -172,6 +174,10 @@ export default function ClientContentPage() {
   const [notFound, setNotFound] = useState(false);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [showPosted, setShowPosted] = useState(false);
+  const [showPastDue, setShowPastDue] = useState(false);
+  const { user } = useAuth();
+  const { isAdmin } = useUserRole();
+  const isInternal = !!user && isAdmin;
 
   useEffect(() => {
     if (!taskId) return;
@@ -275,7 +281,6 @@ export default function ClientContentPage() {
   }
 
   const pendingTasks = tasks.filter(t => {
-    // Always show the task that matches the taskId in the URL
     if (taskId && t.id === taskId) return true;
     
     if (t.status === 'Postado') return false;
@@ -284,10 +289,20 @@ export default function ClientContentPage() {
     const date = new Date(taskDate);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    return date >= today;
+    if (date < today && !isInternal) return false;
+    return true;
+  });
+  const pastDueTasks = tasks.filter(t => {
+    if (t.status === 'Postado') return false;
+    const taskDate = t.scheduled_date || t.due_date;
+    if (!taskDate) return false;
+    const date = new Date(taskDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return date < today && isInternal;
   });
   const postedTasks = tasks.filter(t => t.status === 'Postado');
-  const displayedTasks = showPosted ? tasks : pendingTasks;
+  const displayedTasks = showPosted ? tasks : [...pendingTasks, ...(isInternal && showPastDue ? pastDueTasks : [])];
 
   return (
     <div className="min-h-screen bg-background">
@@ -313,6 +328,15 @@ export default function ClientContentPage() {
               className="text-sm text-primary hover:underline"
             >
               {showPosted ? 'Ocultar publicados' : `Ver ${postedTasks.length} publicados`}
+            </button>
+          )}
+          {isInternal && pastDueTasks.length > 0 && (
+            <button
+              onClick={() => setShowPastDue(!showPastDue)}
+              className="text-sm text-red-500 hover:underline flex items-center gap-1"
+            >
+              <Lock className="h-3 w-3" />
+              {showPastDue ? 'Ocultar atrasadas' : `Ver ${pastDueTasks.length} atrasadas`}
             </button>
           )}
         </div>
