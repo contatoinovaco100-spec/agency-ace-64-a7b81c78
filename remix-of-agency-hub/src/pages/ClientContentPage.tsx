@@ -140,7 +140,18 @@ export default function ClientContentPage() {
         if (clientData) setClientName(clientData.company_name);
 
         const { data: allTasks } = await supabase.from('tasks').select('*').eq('client_id', clientId).order('created_at');
-        setTasks((allTasks || [singleTask]) as TaskData[]);
+        let loadedTasks = (allTasks || [singleTask]) as TaskData[];
+        
+        // Filter out past posted content
+        loadedTasks = loadedTasks.filter(task => {
+          if (task.status !== 'Postado' || !task.due_date) return true;
+          const dueDate = new Date(task.due_date);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          return dueDate >= today;
+        });
+        
+        setTasks(loadedTasks);
       } else {
         setTasks([singleTask as TaskData]);
       }
@@ -154,7 +165,18 @@ export default function ClientContentPage() {
       setClientName(clientData.company_name);
       const { data: allTasks } = await supabase.from('tasks').select('*').eq('client_id', id).order('created_at');
       if (allTasks && allTasks.length > 0) {
-        setTasks(allTasks as TaskData[]);
+        let loadedTasks = allTasks as TaskData[];
+        
+        // Filter out past posted content
+        loadedTasks = loadedTasks.filter(task => {
+          if (task.status !== 'Postado' || !task.due_date) return true;
+          const dueDate = new Date(task.due_date);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          return dueDate >= today;
+        });
+        
+        setTasks(loadedTasks);
         setLoading(false);
         return;
       }
@@ -189,7 +211,7 @@ export default function ClientContentPage() {
           <img src={logoInova} alt="Inova" className="h-10" />
           <div className="text-right">
             {clientName && <p className="text-sm font-medium text-foreground">{clientName}</p>}
-            <p className="text-xs text-muted-foreground">{tasks.length} {tasks.length === 1 ? 'conteúdo' : 'conteúdos'}</p>
+            <p className="text-xs text-muted-foreground">{tasks.length} {tasks.length === 1 ? 'conteúdo pendente' : 'conteúdos pendentes'}</p>
           </div>
         </div>
       </header>
